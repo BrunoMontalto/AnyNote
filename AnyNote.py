@@ -38,6 +38,14 @@ class NoteFrame:
         self.surf = pygame.Surface(size)
     
 
+    def print(self):
+        for i in range(len(self.lines)):
+            print(self.lines[i])
+
+    def set_size(self, size):
+        self.w, self.h = size
+        self.surf = pygame.Surface(size)
+
     def new_line(self):
         if self.cursor_col < len(self.lines[self.cursor_line]):
             new_line_content = self.lines[self.cursor_line][self.cursor_col:]
@@ -47,6 +55,48 @@ class NoteFrame:
         self.cursor_line += 1
         self.cursor_col = 0
         self.lines.insert(self.cursor_line, new_line_content)
+
+    def delete_selection(self):
+        selection_start = self.selection_start
+        selection_end = self.selection_end
+        #compare selection positions
+        selection_start_pos = 0
+        for i in range(selection_start[0]):
+            selection_start_pos += len(self.lines[i])
+        selection_start_pos += selection_start[1]
+
+        selection_end_pos = 0
+        for i in range(selection_end[0]):
+            selection_end_pos += len(self.lines[i])
+        selection_end_pos += selection_end[1]
+
+        #put start and end in the correct order
+        if selection_start_pos > selection_end_pos:
+            selection_start, selection_end = selection_end, selection_start
+
+        iter = selection_end[0] - selection_start[0]
+        if iter == 0:
+            start = selection_start[1]
+            end = selection_end[1]
+            self.lines[selection_start[0]] = self.lines[selection_start[0]][:start] + self.lines[selection_start[0]][end:]
+            #TODO vedere se la linea adesso è vuota
+            self.selection_start = None
+            self.selection_end = None
+            self.cursor_col = start
+        else:
+            self.lines[selection_start[0]] = self.lines[selection_start[0]][:selection_start[1]] + self.lines[selection_end[0]][selection_end[1]:]
+
+            for i in range(iter ):
+                self.lines.pop(selection_start[0] + 1)
+            
+            self.cursor_line = selection_start[0]
+            self.cursor_col = selection_start[1]
+
+        self.selection_start = None
+        self.selection_end = None
+        
+        self.print()
+
 
     def listen(self, events):
         if self.selecting:
@@ -79,7 +129,12 @@ class NoteFrame:
                     self.new_line()
 
                 elif event.key == pygame.K_BACKSPACE: #backspace
-                    if self.cursor_col == 0:
+                    selection_start = self.selection_start
+                    selection_end = self.selection_end
+                    if selection_start != selection_end and (selection_start and selection_end): #delete selection
+                        self.delete_selection()
+
+                    elif self.cursor_col == 0:
                         if self.cursor_line > 0:
                             removed_line = self.lines[self.cursor_line]
                             self.lines.pop(self.cursor_line)
@@ -129,13 +184,22 @@ class NoteFrame:
                             self.cursor_col = len(self.lines[self.cursor_line])
 
 
+                elif (event.key == pygame.K_c) and (event.mod & pygame.KMOD_CTRL): #CTRL C
+                    #TODO
+                    pass
+
                 elif (event.key == pygame.K_v) and (event.mod & pygame.KMOD_CTRL): #CTRL V
+                    print("ctrl V")
                     for c in root.clipboard_get():
                         if c == "\n":
                             self.new_line()
                             continue
                         self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + c + self.lines[self.cursor_line][self.cursor_col:]
                         self.cursor_col += 1
+
+                elif (event.key == pygame.K_a) and (event.mod & pygame.KMOD_CTRL): #CTRL A
+                    self.selection_start = (0, 0)
+                    self.selection_end = (len(self.lines) - 1, len(self.lines[-1]))
                 else:
                     if event.key in (1073742049, 1073742048): continue #TODO aggiungere altri tasti vietati
                     self.cursor_color_swap_timer = CURSOR_COLOR_SWAP_TIMER

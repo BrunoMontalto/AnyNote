@@ -1,7 +1,7 @@
 from AnyNote import *
 
 size = w,h = 500, 500
-wn = pygame.display.set_mode(size)
+wn = pygame.display.set_mode(size, pygame.RESIZABLE)
 
 
 def main():
@@ -14,7 +14,9 @@ def main():
             if event.type == pygame.QUIT:
                 return
             
+            
         #######################
+        frame.set_size(wn.get_size())
         frame.listen(events)
 
         wn.fill((0,0,0))
