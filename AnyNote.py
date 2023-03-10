@@ -13,7 +13,7 @@ root.withdraw()
 # Constants
 DEFAULT_FONT = pygame.font.SysFont("Consolas", 16)
 #                bg             fg
-DEFAULT_THEME = [(50, 50, 50), (250, 250, 250)]
+DEFAULT_THEME = [(60, 60, 60), (250, 250, 250)]
 CURSOR_COLOR_SWAP_TIMER = 30
 LINE_INDEX_WIDTH = 50
 LINE_PAD = 5
@@ -101,6 +101,8 @@ class NoteFrame:
     def listen(self, events):
         if self.selecting:
             mx, my = pygame.mouse.get_pos()
+            mx -= self.x
+            my -= self.y
             mx -= LINE_INDEX_WIDTH + LINE_PAD
             font_h = self.font.size('|')[1]
             self.cursor_line = my // font_h
@@ -200,6 +202,15 @@ class NoteFrame:
                 elif (event.key == pygame.K_a) and (event.mod & pygame.KMOD_CTRL): #CTRL A
                     self.selection_start = (0, 0)
                     self.selection_end = (len(self.lines) - 1, len(self.lines[-1]))
+
+
+                elif (event.key == pygame.K_s) and (event.mod & pygame.KMOD_CTRL):
+                    self.save()
+
+                elif event.key == 9: #tab
+                    self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + "    " + self.lines[self.cursor_line][self.cursor_col:]
+                    self.cursor_col += 4
+
                 else:
                     if event.key in (1073742049, 1073742048): continue #TODO aggiungere altri tasti vietati
                     self.cursor_color_swap_timer = CURSOR_COLOR_SWAP_TIMER
@@ -265,21 +276,21 @@ class NoteFrame:
                 #find selection start and end in pixels
                 start = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[selection_start[0]][:selection_start[1]])[0]
                 end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[selection_end[0]][:selection_end[1]])[0]
-                pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, selection_start[0] * font_h, end - start, font_h))
+                pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, selection_start[0] * font_h, max(3, end - start), font_h))
             else:
                 for i in range(iter):
                     if i == 0:
                         start = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[selection_start[0] + i][:selection_start[1]])[0]
                         end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[selection_start[0] + i])[0]
-                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h, end - start, font_h))
+                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h, max(3, end - start), font_h))
                     elif i == iter - 1:
                         start = LINE_INDEX_WIDTH + LINE_PAD
                         end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[selection_end[0]][:selection_end[1]])[0]
-                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h, end - start, font_h))
+                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h, max(3, end - start), font_h))
                     else:
                         start = LINE_INDEX_WIDTH + LINE_PAD
                         end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[selection_start[0] + i])[0]
-                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h, end - start, font_h))
+                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h, max(3, end - start), font_h))
 
 
         
@@ -305,3 +316,11 @@ class NoteFrame:
         pygame.draw.rect(self.surf, self.cursor_color, (LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[self.cursor_line][:self.cursor_col])[0], font_h*self.cursor_line,  1, font_h ))
         
         surface.blit(self.surf, (self.x, self.y))
+
+
+    def save(self):
+        with open("save.txt", "w") as f:
+            for line in self.lines:
+                f.write(line)
+            
+            f.close()

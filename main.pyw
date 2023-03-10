@@ -3,6 +3,8 @@ from AnyNote import *
 size = w,h = 500, 500
 wn = pygame.display.set_mode(size, pygame.RESIZABLE)
 
+pygame.display.set_caption("AnyNote")
+pygame.display.set_icon(pygame.image.load("icon.png").convert_alpha())
 
 def main():
     clock = pygame.time.Clock()
