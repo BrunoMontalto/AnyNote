@@ -37,6 +37,8 @@ class NoteFrame:
         self.selection_start = None
         self.selection_end = None
 
+        self.scroll = 0
+
         self.surf = pygame.Surface(size)
     
 
@@ -97,20 +99,23 @@ class NoteFrame:
         self.selection_start = None
         self.selection_end = None
         
-        self.print()
+        #self.print()
 
 
     def listen(self, events, mx, my):
         #get mouse position relative to the frame
         mx -= self.x
-        my -= self.y
         mx -= LINE_INDEX_WIDTH + LINE_PAD
+        my -= self.y
+        my += self.scroll
+
         if mx > 0:
-            cursor_img = 1
+            pointer_img = 1
         else:
-            cursor_img = 0
+            pointer_img = 0
+
+        font_h = self.font.size('|')[1]
         if self.selecting:
-            font_h = self.font.size('|')[1]
             self.cursor_line = my // font_h
             if self.cursor_line >= len(self.lines):
                 self.cursor_line = len(self.lines) - 1
@@ -232,6 +237,8 @@ class NoteFrame:
                 elif (event.key == pygame.K_a) and (event.mod & pygame.KMOD_CTRL): #CTRL A
                     self.selection_start = (0, 0)
                     self.selection_end = (len(self.lines) - 1, len(self.lines[-1]))
+                    self.cursor_line = len(self.lines) - 1
+                    self.cursor_col = len(self.lines[self.cursor_line])
 
 
                 elif (event.key == pygame.K_s) and (event.mod & pygame.KMOD_CTRL):
@@ -254,32 +261,45 @@ class NoteFrame:
                     self.cursor_col += 1
             
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                mx, my = pygame.mouse.get_pos()
-                mx -= LINE_INDEX_WIDTH + LINE_PAD
-                font_h = self.font.size('|')[1]
-                self.cursor_line = my // font_h
-                if self.cursor_line >= len(self.lines):
-                    self.cursor_line = len(self.lines) - 1
-                    self.cursor_col = len(self.lines[self.cursor_line])
-                else:    
-                    mrow = 0
-                    for c in self.lines[self.cursor_line]:
-                        mx -= self.font.size(c)[0]
-                        if mx < 0:
-                            break
-                        mrow += 1
-                    
-                    self.cursor_col = mrow
+                if event.button == 1:
+                    font_h = self.font.size('|')[1]
+                    self.cursor_line = my // font_h
+                    if self.cursor_line >= len(self.lines):
+                        self.cursor_line = len(self.lines) - 1
+                        self.cursor_col = len(self.lines[self.cursor_line])
+                    else:    
+                        mrow = 0
+                        for c in self.lines[self.cursor_line]:
+                            mx -= self.font.size(c)[0]
+                            if mx < 0:
+                                break
+                            mrow += 1
+                        
+                        self.cursor_col = mrow
 
-                self.selecting = True
-                self.selection_start = (self.cursor_line, self.cursor_col)
-                self.selection_end = None
+                    self.selecting = True
+                    self.selection_start = (self.cursor_line, self.cursor_col)
+                    self.selection_end = None
+                
+                #TODO fluid scrolling
+                elif event.button == 4: #up
+                    self.scroll -= font_h*3
+                    if self.scroll < 0:
+                        self.scroll = 0
+                elif event.button == 5: #down
+                    self.scroll += font_h*3
+                
+                
 
             elif event.type == pygame.MOUSEBUTTONUP:
-                self.selecting = False
-                self.selection_end = (self.cursor_line, self.cursor_col)
+                if event.button == 1:
+                    self.selecting = False
+                    self.selection_end = (self.cursor_line, self.cursor_col)
+
+        if self.scroll > font_h * (len(self.lines) - 1):
+            self.scroll = font_h * (len(self.lines) - 1)
     
-        return cursor_img
+        return pointer_img
 
 
     def draw(self, surface):
@@ -313,31 +333,32 @@ class NoteFrame:
                 #find selection start and end in pixels
                 start = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[selection_start[0]][:selection_start[1]])[0]
                 end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[selection_end[0]][:selection_end[1]])[0]
-                pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, selection_start[0] * font_h, max(3, end - start), font_h))
+                pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, selection_start[0] * font_h - self.scroll, max(3, end - start), font_h))
             else:
                 for i in range(iter):
                     if i == 0:
                         start = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[selection_start[0] + i][:selection_start[1]])[0]
                         end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[selection_start[0] + i])[0]
-                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h, max(3, end - start), font_h))
+                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h - self.scroll, max(3, end - start), font_h))
                     elif i == iter - 1:
                         start = LINE_INDEX_WIDTH + LINE_PAD
                         end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[selection_end[0]][:selection_end[1]])[0]
-                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h, max(3, end - start), font_h))
+                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h - self.scroll, max(3, end - start), font_h))
                     else:
                         start = LINE_INDEX_WIDTH + LINE_PAD
                         end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[selection_start[0] + i])[0]
-                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h, max(3, end - start), font_h))
+                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h - self.scroll, max(3, end - start), font_h))
 
 
         
         #text
-        for i in range(len(self.lines)):
+        #print("range: ", (max(self.scroll//font_h - 1, 0), min(self.scroll//font_h + self.h//font_h + 1 ,len(self.lines))))
+        for i in range(max(self.scroll//font_h - 1, 0), min(self.scroll//font_h + self.h//font_h + 1 ,len(self.lines))):
             index = self.font.render(str(i), True, colorSum(self.theme[1], (-50, -50, -50)))
             text = self.font.render(str(self.lines[i]), True, self.theme[1])
 
-            self.surf.blit(index, (LINE_INDEX_WIDTH//2 - index.get_width()//2, font_h * i + font_h//2 - index.get_height()//2))
-            self.surf.blit(text, (LINE_INDEX_WIDTH + LINE_PAD, font_h * i + font_h//2 - text.get_height()//2))
+            self.surf.blit(index, (LINE_INDEX_WIDTH//2 - index.get_width()//2, font_h * i + font_h//2 - index.get_height()//2 - self.scroll))
+            self.surf.blit(text, (LINE_INDEX_WIDTH + LINE_PAD, font_h * i + font_h//2 - text.get_height()//2 - self.scroll))
         
 
         #cursor
@@ -350,7 +371,7 @@ class NoteFrame:
         
         self.cursor_color_swap_timer -= 1
 
-        pygame.draw.rect(self.surf, self.cursor_color, (LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[self.cursor_line][:self.cursor_col])[0], font_h*self.cursor_line,  1, font_h ))
+        pygame.draw.rect(self.surf, self.cursor_color, (LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.lines[self.cursor_line][:self.cursor_col])[0], font_h*self.cursor_line -self.scroll,  1, font_h ))
         
         surface.blit(self.surf, (self.x, self.y))
 
