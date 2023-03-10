@@ -1,7 +1,7 @@
 import pygame
 from pygameGUI import *
-import time
 import tkinter as tk #for clipboard
+import os
 
 pygame.init()
 pygame.font.init()
@@ -17,6 +17,8 @@ DEFAULT_THEME = [(60, 60, 60), (250, 250, 250)]
 CURSOR_COLOR_SWAP_TIMER = 30
 LINE_INDEX_WIDTH = 50
 LINE_PAD = 5
+
+
 
 class NoteFrame:
     def __init__(self, position, size, font, theme):
@@ -98,12 +100,16 @@ class NoteFrame:
         self.print()
 
 
-    def listen(self, events):
+    def listen(self, events, mx, my):
+        #get mouse position relative to the frame
+        mx -= self.x
+        my -= self.y
+        mx -= LINE_INDEX_WIDTH + LINE_PAD
+        if mx > 0:
+            cursor_img = 1
+        else:
+            cursor_img = 0
         if self.selecting:
-            mx, my = pygame.mouse.get_pos()
-            mx -= self.x
-            my -= self.y
-            mx -= LINE_INDEX_WIDTH + LINE_PAD
             font_h = self.font.size('|')[1]
             self.cursor_line = my // font_h
             if self.cursor_line >= len(self.lines):
@@ -149,24 +155,46 @@ class NoteFrame:
 
                 
                 elif event.key == pygame.K_RIGHT:
-                    self.cursor_col += 1
-                    if self.cursor_col > len(self.lines[self.cursor_line]):
-                        self.cursor_line += 1
-                        if self.cursor_line >= len(self.lines):
-                            self.cursor_line = len(self.lines) - 1
-                            self.cursor_col = len(self.lines[self.cursor_line])
-                            continue
-                        self.cursor_col = 0
+                    if event.mod & pygame.KMOD_CTRL:
+                        if self.cursor_col < len(self.lines[self.cursor_line]):
+                            c = self.lines[self.cursor_line][self.cursor_col]
+                            if c == " ":
+                                self.cursor_col += 1
+                            else:
+                                while c != " " and self.cursor_col < len(self.lines[self.cursor_line]):
+                                    self.cursor_col += 1
+                                    if self.cursor_col < len(self.lines[self.cursor_line]):
+                                        c = self.lines[self.cursor_line][self.cursor_col]
+                                
+                    else:
+                        self.cursor_col += 1
+                        if self.cursor_col > len(self.lines[self.cursor_line]):
+                            self.cursor_line += 1
+                            if self.cursor_line >= len(self.lines):
+                                self.cursor_line = len(self.lines) - 1
+                                self.cursor_col = len(self.lines[self.cursor_line])
+                                continue
+                            self.cursor_col = 0
 
                 elif event.key == pygame.K_LEFT:
-                    self.cursor_col -= 1
-                    if self.cursor_col < 0:
-                        self.cursor_line -= 1
-                        if self.cursor_line < 0:
-                            self.cursor_line = 0
-                            self.cursor_col = 0
-                            continue
-                        self.cursor_col = len(self.lines[self.cursor_line])
+                    if event.mod & pygame.KMOD_CTRL:
+                        if self.cursor_col > 0:
+                            c = self.lines[self.cursor_line][self.cursor_col - 1]
+                            if c == " ":
+                                self.cursor_col -= 1
+                            else:
+                                while c != " " and self.cursor_col > 0:
+                                    self.cursor_col -= 1
+                                    c = self.lines[self.cursor_line][self.cursor_col - 1]
+                    else:
+                        self.cursor_col -= 1
+                        if self.cursor_col < 0:
+                            self.cursor_line -= 1
+                            if self.cursor_line < 0:
+                                self.cursor_line = 0
+                                self.cursor_col = 0
+                                continue
+                            self.cursor_col = len(self.lines[self.cursor_line])
 
 
                 elif event.key == pygame.K_UP:
@@ -185,6 +213,8 @@ class NoteFrame:
                         if self.cursor_col > len(self.lines[self.cursor_line]):
                             self.cursor_col = len(self.lines[self.cursor_line])
 
+                
+                    
 
                 elif (event.key == pygame.K_c) and (event.mod & pygame.KMOD_CTRL): #CTRL C
                     #TODO
@@ -215,6 +245,11 @@ class NoteFrame:
                     if event.key in (1073742049, 1073742048): continue #TODO aggiungere altri tasti vietati
                     self.cursor_color_swap_timer = CURSOR_COLOR_SWAP_TIMER
 
+                    selection_start = self.selection_start
+                    selection_end = self.selection_end
+                    if selection_start != selection_end and (selection_start and selection_end): #delete selection
+                        self.delete_selection()
+
                     self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + event.unicode + self.lines[self.cursor_line][self.cursor_col:]
                     self.cursor_col += 1
             
@@ -243,6 +278,8 @@ class NoteFrame:
             elif event.type == pygame.MOUSEBUTTONUP:
                 self.selecting = False
                 self.selection_end = (self.cursor_line, self.cursor_col)
+    
+        return cursor_img
 
 
     def draw(self, surface):
@@ -321,6 +358,6 @@ class NoteFrame:
     def save(self):
         with open("save.txt", "w") as f:
             for line in self.lines:
-                f.write(line)
+                f.write(line + '\n')
             
             f.close()
