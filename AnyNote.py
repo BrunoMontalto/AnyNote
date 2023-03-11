@@ -12,9 +12,13 @@ root.withdraw()
 
 # Constants
 DEFAULT_FONT = pygame.font.SysFont("Consolas", 16)
+GUI_FONT = pygame.font.SysFont("Consolas", 12)
 #                bg             fg
 DEFAULT_THEME = [(60, 60, 60), (250, 250, 250)]
+
 CURSOR_COLOR_SWAP_TIMER = 30
+REPEAT_TIMER = 30
+
 LINE_INDEX_WIDTH = 50
 LINE_PAD = 5
 
@@ -37,6 +41,10 @@ class NoteFrame:
         self.selection_start = None
         self.selection_end = None
 
+        self.repeat_timer = REPEAT_TIMER
+        self.input_hold = None
+        self.prev_input_hold = None
+
         self.scroll = 0
 
         self.surf = pygame.Surface(size)
@@ -47,6 +55,8 @@ class NoteFrame:
             print(self.lines[i])
 
     def set_size(self, size):
+        if size[0] < 0 or size[1] < 0:
+            return
         self.w, self.h = size
         self.surf = pygame.Surface(size)
 
@@ -102,6 +112,187 @@ class NoteFrame:
         #self.print()
 
 
+    def handle_input(self, event, mx, my, font_h):
+        if event.type == pygame.KEYDOWN:
+            print("unicode:", event.unicode)
+            print("event key:", event.key)
+
+        
+            self.input_hold = (event.key, event.mod, event.unicode)
+
+            if event.key == pygame.K_RETURN:
+                self.new_line()
+
+            elif event.key == pygame.K_BACKSPACE: #backspace
+                selection_start = self.selection_start
+                selection_end = self.selection_end
+                if selection_start != selection_end and (selection_start and selection_end): #delete selection
+                    self.delete_selection()
+
+                elif self.cursor_col == 0:
+                    if self.cursor_line > 0:
+                        removed_line = self.lines[self.cursor_line]
+                        self.lines.pop(self.cursor_line)
+                        self.cursor_line -= 1
+                        self.cursor_col = len(self.lines[self.cursor_line])
+                        self.lines[self.cursor_line] = self.lines[self.cursor_line] + removed_line
+                else:
+                    self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col - 1] + self.lines[self.cursor_line][self.cursor_col:]
+                    self.cursor_col -= 1
+
+                #scroll to cursor
+                if self.cursor_line < self.scroll//font_h or self.cursor_line > self.scroll//font_h + self.h/font_h:
+                    self.scroll = self.cursor_line * font_h
+
+            
+            elif event.key == pygame.K_RIGHT:
+                if event.mod & pygame.KMOD_CTRL:
+                    if self.cursor_col < len(self.lines[self.cursor_line]):
+                        c = self.lines[self.cursor_line][self.cursor_col]
+                        if c == " ":
+                            self.cursor_col += 1
+                        else:
+                            while c != " " and self.cursor_col < len(self.lines[self.cursor_line]):
+                                self.cursor_col += 1
+                                if self.cursor_col < len(self.lines[self.cursor_line]):
+                                    c = self.lines[self.cursor_line][self.cursor_col]
+                            
+                else:
+                    self.cursor_col += 1
+                    if self.cursor_col > len(self.lines[self.cursor_line]):
+                        self.cursor_line += 1
+                        if self.cursor_line >= len(self.lines):
+                            self.cursor_line = len(self.lines) - 1
+                            self.cursor_col = len(self.lines[self.cursor_line])
+                            return
+                        self.cursor_col = 0
+
+            elif event.key == pygame.K_LEFT:
+                if event.mod & pygame.KMOD_CTRL:
+                    if self.cursor_col > 0:
+                        c = self.lines[self.cursor_line][self.cursor_col - 1]
+                        if c == " ":
+                            self.cursor_col -= 1
+                        else:
+                            while c != " " and self.cursor_col > 0:
+                                self.cursor_col -= 1
+                                c = self.lines[self.cursor_line][self.cursor_col - 1]
+                else:
+                    self.cursor_col -= 1
+                    if self.cursor_col < 0:
+                        self.cursor_line -= 1
+                        if self.cursor_line < 0:
+                            self.cursor_line = 0
+                            self.cursor_col = 0
+                            return
+                        self.cursor_col = len(self.lines[self.cursor_line])
+
+
+            elif event.key == pygame.K_UP:
+                self.cursor_line -= 1
+                if self.cursor_line < 0:
+                    self.cursor_line = 0
+                else:
+                    if self.cursor_col > len(self.lines[self.cursor_line]):
+                        self.cursor_col = len(self.lines[self.cursor_line])
+
+            elif event.key == pygame.K_DOWN:
+                self.cursor_line += 1
+                if self.cursor_line > len(self.lines) - 1:
+                    self.cursor_line = len(self.lines) - 1
+                else:
+                    if self.cursor_col > len(self.lines[self.cursor_line]):
+                        self.cursor_col = len(self.lines[self.cursor_line])
+
+            
+                
+
+            elif (event.key == pygame.K_c) and (event.mod & pygame.KMOD_CTRL): #CTRL C
+                #TODO
+                pass
+
+            elif (event.key == pygame.K_v) and (event.mod & pygame.KMOD_CTRL): #CTRL V
+                print("ctrl V")
+                for c in root.clipboard_get():
+                    if c == "\n":
+                        self.new_line()
+                        continue
+                    self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + c + self.lines[self.cursor_line][self.cursor_col:]
+                    self.cursor_col += 1
+                
+                #scroll to cursor
+                if self.cursor_line < self.scroll//font_h or self.cursor_line > self.scroll//font_h + self.h/font_h:
+                    self.scroll = self.cursor_line * font_h
+
+            elif (event.key == pygame.K_a) and (event.mod & pygame.KMOD_CTRL): #CTRL A
+                self.selection_start = (0, 0)
+                self.selection_end = (len(self.lines) - 1, len(self.lines[-1]))
+                self.cursor_line = len(self.lines) - 1
+                self.cursor_col = len(self.lines[self.cursor_line])
+
+
+            elif (event.key == pygame.K_s) and (event.mod & pygame.KMOD_CTRL):
+                self.save()
+
+            elif event.key == 9: #tab
+                self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + "    " + self.lines[self.cursor_line][self.cursor_col:]
+                self.cursor_col += 4
+
+            else:
+                if event.key in (1073742049, 1073742048): return #TODO aggiungere altri tasti vietati
+                self.cursor_color_swap_timer = CURSOR_COLOR_SWAP_TIMER
+
+                selection_start = self.selection_start
+                selection_end = self.selection_end
+                if selection_start != selection_end and (selection_start and selection_end): #delete selection
+                    self.delete_selection()
+
+                self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + event.unicode + self.lines[self.cursor_line][self.cursor_col:]
+                self.cursor_col += 1
+        
+
+        elif event.type == pygame.KEYUP:
+            self.input_hold = None
+            self.repeat_timer = REPEAT_TIMER
+
+
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:
+                font_h = self.font.size('|')[1]
+                self.cursor_line = my // font_h
+                if self.cursor_line >= len(self.lines):
+                    self.cursor_line = len(self.lines) - 1
+                    self.cursor_col = len(self.lines[self.cursor_line])
+                else:    
+                    mrow = 0
+                    for c in self.lines[self.cursor_line]:
+                        mx -= self.font.size(c)[0]
+                        if mx < 0:
+                            break
+                        mrow += 1
+                    
+                    self.cursor_col = mrow
+
+                self.selecting = True
+                self.selection_start = (self.cursor_line, self.cursor_col)
+                self.selection_end = None
+            
+            #TODO fluid scrolling
+            elif event.button == 4: #up
+                self.scroll -= font_h*3
+                if self.scroll < 0:
+                    self.scroll = 0
+            elif event.button == 5: #down
+                self.scroll += font_h*3
+            
+            
+
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1:
+                self.selecting = False
+                self.selection_end = (self.cursor_line, self.cursor_col)
+
+
     def listen(self, events, mx, my):
         #get mouse position relative to the frame
         mx -= self.x
@@ -131,173 +322,27 @@ class NoteFrame:
                 self.cursor_col = mrow
             
             self.selection_end = (self.cursor_line, self.cursor_col)
+
+
+        if self.prev_input_hold == self.input_hold and self.input_hold:
+                self.repeat_timer -= 1
+                if self.repeat_timer <= 0:
+                    e = pygame.event.Event(pygame.KEYDOWN)
+
+                    e.key, e.mod, e.unicode = self.input_hold
+                    self.handle_input(e, mx, my, font_h)
+        else:
+            self.repeat_timer = REPEAT_TIMER
+
+        self.prev_input_hold = self.input_hold
         
         for event in events:
-            if event.type == pygame.KEYDOWN:
-                print("unicode:", event.unicode)
-                print("event key:", event.key)
-
-
-                if event.key == pygame.K_RETURN:
-                    self.new_line()
-
-                elif event.key == pygame.K_BACKSPACE: #backspace
-                    selection_start = self.selection_start
-                    selection_end = self.selection_end
-                    if selection_start != selection_end and (selection_start and selection_end): #delete selection
-                        self.delete_selection()
-
-                    elif self.cursor_col == 0:
-                        if self.cursor_line > 0:
-                            removed_line = self.lines[self.cursor_line]
-                            self.lines.pop(self.cursor_line)
-                            self.cursor_line -= 1
-                            self.cursor_col = len(self.lines[self.cursor_line])
-                            self.lines[self.cursor_line] = self.lines[self.cursor_line] + removed_line
-                    else:
-                        self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col - 1] + self.lines[self.cursor_line][self.cursor_col:]
-                        self.cursor_col -= 1
-
-                
-                elif event.key == pygame.K_RIGHT:
-                    if event.mod & pygame.KMOD_CTRL:
-                        if self.cursor_col < len(self.lines[self.cursor_line]):
-                            c = self.lines[self.cursor_line][self.cursor_col]
-                            if c == " ":
-                                self.cursor_col += 1
-                            else:
-                                while c != " " and self.cursor_col < len(self.lines[self.cursor_line]):
-                                    self.cursor_col += 1
-                                    if self.cursor_col < len(self.lines[self.cursor_line]):
-                                        c = self.lines[self.cursor_line][self.cursor_col]
-                                
-                    else:
-                        self.cursor_col += 1
-                        if self.cursor_col > len(self.lines[self.cursor_line]):
-                            self.cursor_line += 1
-                            if self.cursor_line >= len(self.lines):
-                                self.cursor_line = len(self.lines) - 1
-                                self.cursor_col = len(self.lines[self.cursor_line])
-                                continue
-                            self.cursor_col = 0
-
-                elif event.key == pygame.K_LEFT:
-                    if event.mod & pygame.KMOD_CTRL:
-                        if self.cursor_col > 0:
-                            c = self.lines[self.cursor_line][self.cursor_col - 1]
-                            if c == " ":
-                                self.cursor_col -= 1
-                            else:
-                                while c != " " and self.cursor_col > 0:
-                                    self.cursor_col -= 1
-                                    c = self.lines[self.cursor_line][self.cursor_col - 1]
-                    else:
-                        self.cursor_col -= 1
-                        if self.cursor_col < 0:
-                            self.cursor_line -= 1
-                            if self.cursor_line < 0:
-                                self.cursor_line = 0
-                                self.cursor_col = 0
-                                continue
-                            self.cursor_col = len(self.lines[self.cursor_line])
-
-
-                elif event.key == pygame.K_UP:
-                    self.cursor_line -= 1
-                    if self.cursor_line < 0:
-                        self.cursor_line = 0
-                    else:
-                        if self.cursor_col > len(self.lines[self.cursor_line]):
-                            self.cursor_col = len(self.lines[self.cursor_line])
-
-                elif event.key == pygame.K_DOWN:
-                    self.cursor_line += 1
-                    if self.cursor_line > len(self.lines) - 1:
-                        self.cursor_line = len(self.lines) - 1
-                    else:
-                        if self.cursor_col > len(self.lines[self.cursor_line]):
-                            self.cursor_col = len(self.lines[self.cursor_line])
-
-                
-                    
-
-                elif (event.key == pygame.K_c) and (event.mod & pygame.KMOD_CTRL): #CTRL C
-                    #TODO
-                    pass
-
-                elif (event.key == pygame.K_v) and (event.mod & pygame.KMOD_CTRL): #CTRL V
-                    print("ctrl V")
-                    for c in root.clipboard_get():
-                        if c == "\n":
-                            self.new_line()
-                            continue
-                        self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + c + self.lines[self.cursor_line][self.cursor_col:]
-                        self.cursor_col += 1
-
-                elif (event.key == pygame.K_a) and (event.mod & pygame.KMOD_CTRL): #CTRL A
-                    self.selection_start = (0, 0)
-                    self.selection_end = (len(self.lines) - 1, len(self.lines[-1]))
-                    self.cursor_line = len(self.lines) - 1
-                    self.cursor_col = len(self.lines[self.cursor_line])
-
-
-                elif (event.key == pygame.K_s) and (event.mod & pygame.KMOD_CTRL):
-                    self.save()
-
-                elif event.key == 9: #tab
-                    self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + "    " + self.lines[self.cursor_line][self.cursor_col:]
-                    self.cursor_col += 4
-
-                else:
-                    if event.key in (1073742049, 1073742048): continue #TODO aggiungere altri tasti vietati
-                    self.cursor_color_swap_timer = CURSOR_COLOR_SWAP_TIMER
-
-                    selection_start = self.selection_start
-                    selection_end = self.selection_end
-                    if selection_start != selection_end and (selection_start and selection_end): #delete selection
-                        self.delete_selection()
-
-                    self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + event.unicode + self.lines[self.cursor_line][self.cursor_col:]
-                    self.cursor_col += 1
-            
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
-                    font_h = self.font.size('|')[1]
-                    self.cursor_line = my // font_h
-                    if self.cursor_line >= len(self.lines):
-                        self.cursor_line = len(self.lines) - 1
-                        self.cursor_col = len(self.lines[self.cursor_line])
-                    else:    
-                        mrow = 0
-                        for c in self.lines[self.cursor_line]:
-                            mx -= self.font.size(c)[0]
-                            if mx < 0:
-                                break
-                            mrow += 1
-                        
-                        self.cursor_col = mrow
-
-                    self.selecting = True
-                    self.selection_start = (self.cursor_line, self.cursor_col)
-                    self.selection_end = None
-                
-                #TODO fluid scrolling
-                elif event.button == 4: #up
-                    self.scroll -= font_h*3
-                    if self.scroll < 0:
-                        self.scroll = 0
-                elif event.button == 5: #down
-                    self.scroll += font_h*3
-                
-                
-
-            elif event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 1:
-                    self.selecting = False
-                    self.selection_end = (self.cursor_line, self.cursor_col)
+            self.handle_input(event, mx, my, font_h)
 
         if self.scroll > font_h * (len(self.lines) - 1):
             self.scroll = font_h * (len(self.lines) - 1)
+
+        #if self.cursor_line < self.scroll//font_h or self.cursor_line > self.scroll//font_h + self.h/:
     
         return pointer_img
 
