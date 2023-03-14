@@ -32,6 +32,9 @@ class NoteFrame:
         self.theme = theme
 
         self.lines = [""]
+
+        self.tab_size = 4
+
         self.cursor_col = 0
         self.cursor_line = 0
         self.cursor_color = self.theme[1]
@@ -66,9 +69,26 @@ class NoteFrame:
             self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col]
         else:
             new_line_content = ""
+        
+        p = None
+        if self.cursor_col > 0 and self.lines[self.cursor_line][self.cursor_col - 1] in ('(', '[', '{'):
+            for par in ('(', '[', '{'):
+                if self.lines[self.cursor_line][self.cursor_col - 1] == par:
+                    new_line_content = (' ' * self.tab_size) + new_line_content
+                    self.cursor_col = self.tab_size
+                    p = par
+                    break
+            
+
+        else:
+            self.cursor_col = 0
         self.cursor_line += 1
-        self.cursor_col = 0
         self.lines.insert(self.cursor_line, new_line_content)
+        if p and self.cursor_col < len(self.lines[self.cursor_line]):
+            if self.lines[self.cursor_line][self.cursor_col] == chr(ord(p) + 1 + int(p in ('[', '{'))):
+                temp_line, temp_col = self.cursor_line, self.cursor_col
+                self.new_line()
+                self.cursor_line, self.cursor_col = temp_line, temp_col
 
     def delete_selection(self):
         selection_start = self.selection_start
@@ -137,12 +157,41 @@ class NoteFrame:
                         self.cursor_col = len(self.lines[self.cursor_line])
                         self.lines[self.cursor_line] = self.lines[self.cursor_line] + removed_line
                 else:
-                    self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col - 1] + self.lines[self.cursor_line][self.cursor_col:]
-                    self.cursor_col -= 1
+                    if event.mod & pygame.KMOD_CTRL:
+                        
+                        if self.cursor_col > 0:
+                            self.selection_start = [self.cursor_line, self.cursor_col]
+                            self.selection_end = (self.cursor_line, self.cursor_col)
+                            c = self.lines[self.selection_start[0]][self.selection_start[1] - 1]
+                            if c == " ":
+                                self.selection_start[1] -= 1
+                            else:
+                                while c != " " and self.selection_start[1] > 0:
+                                    self.selection_start[1] -= 1
+                                    c = self.lines[self.selection_start[0]][self.selection_start[1] - 1]
+                            self.cursor_col = self.selection_start[1]
+                            self.delete_selection()
+                    else:
+                        self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col - 1] + self.lines[self.cursor_line][self.cursor_col:]
+                        self.cursor_col -= 1
 
                 #scroll to cursor
                 if self.cursor_line < self.scroll//font_h or self.cursor_line > self.scroll//font_h + self.h/font_h:
                     self.scroll = self.cursor_line * font_h
+            
+            elif event.key == pygame.K_DELETE:
+                selection_start = self.selection_start
+                selection_end = self.selection_end
+                if selection_start != selection_end and (selection_start and selection_end): #delete selection
+                    self.delete_selection()
+
+                elif self.cursor_col == len(self.lines[self.cursor_line]):
+                    if self.cursor_line < len(self.lines) - 1:
+                        removed_line = self.lines[self.cursor_line + 1]
+                        self.lines.pop(self.cursor_line + 1)
+                        self.lines[self.cursor_line] = self.lines[self.cursor_line] + removed_line
+                else:
+                    self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + self.lines[self.cursor_line][self.cursor_col + 1:]
 
             
             elif event.key == pygame.K_RIGHT:
@@ -213,11 +262,16 @@ class NoteFrame:
 
             elif (event.key == pygame.K_v) and (event.mod & pygame.KMOD_CTRL): #CTRL V
                 print("ctrl V")
+                tab = ' ' * self.tab_size
                 for c in root.clipboard_get():
-                    if c == "\n":
+                    if c == '\n':
                         self.new_line()
                         continue
-                    self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + c + self.lines[self.cursor_line][self.cursor_col:]
+                    if c == '\t':
+                       self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + tab + self.lines[self.cursor_line][self.cursor_col:]
+                       self.cursor_col += self.tab_size - 1
+                    else:
+                        self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + c + self.lines[self.cursor_line][self.cursor_col:]
                     self.cursor_col += 1
                 
                 #scroll to cursor
@@ -239,7 +293,6 @@ class NoteFrame:
                 self.cursor_col += 4
 
             else:
-                if event.key in (1073742049, 1073742048): return #TODO aggiungere altri tasti vietati
                 self.cursor_color_swap_timer = CURSOR_COLOR_SWAP_TIMER
 
                 selection_start = self.selection_start
@@ -247,8 +300,15 @@ class NoteFrame:
                 if selection_start != selection_end and (selection_start and selection_end): #delete selection
                     self.delete_selection()
 
-                self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + event.unicode + self.lines[self.cursor_line][self.cursor_col:]
-                self.cursor_col += 1
+                temp = len(self.lines[self.cursor_line])
+                new = event.unicode
+                for par in ('(', '[', '{'):
+                    if new == par:
+                        new += chr(ord(par) + 1 + int(par in ('[', '{')))
+                        break
+                self.lines[self.cursor_line] = self.lines[self.cursor_line][:self.cursor_col] + new + self.lines[self.cursor_line][self.cursor_col:]
+                if len(self.lines[self.cursor_line]) > temp:
+                    self.cursor_col += 1
         
 
         elif event.type == pygame.KEYUP:
