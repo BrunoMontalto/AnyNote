@@ -539,10 +539,11 @@ class NoteFrame:
         self.surf.fill(self.theme[0])
 
         font_h = self.font.size('|')[1]
+        selection_color = colorSum(self.theme[0], (40, 40, 40))
 
         #to erase
         if self.to_erase:
-            pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (self.to_erase.x, self.to_erase.y - self.current_file.scroll, *self.to_erase.surface.get_size()))
+            pygame.draw.rect(self.surf, selection_color, (self.to_erase.x, self.to_erase.y - self.current_file.scroll, *self.to_erase.surface.get_size()))
 
         #selection
         selection_start = self.current_file.selection_start
@@ -565,25 +566,26 @@ class NoteFrame:
 
             #draw selection
             iter = selection_end[0] - selection_start[0] + 1
+            #iter = min(selection_end[0], (self.current_file.scroll + self.h) // font_h) - max(selection_start[0], self.current_file.scroll // font_h) + 1
             if iter == 1:
                 #find selection start and end in pixels
                 start = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.current_file[selection_start[0]][:selection_start[1]])[0]
                 end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.current_file[selection_end[0]][:selection_end[1]])[0]
-                pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, selection_start[0] * font_h - self.current_file.scroll, max(3, end - start), font_h))
+                pygame.draw.rect(self.surf, selection_color, (start, selection_start[0] * font_h - self.current_file.scroll, max(3, end - start), font_h))
             else:
                 for i in range(iter):
                     if i == 0:
                         start = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.current_file[selection_start[0] + i][:selection_start[1]])[0]
                         end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.current_file[selection_start[0] + i])[0]
-                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h - self.current_file.scroll, max(3, end - start), font_h))
+                        pygame.draw.rect(self.surf, selection_color, (start, (selection_start[0] + i) * font_h - self.current_file.scroll, max(3, end - start), font_h))
                     elif i == iter - 1:
                         start = LINE_INDEX_WIDTH + LINE_PAD
                         end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.current_file[selection_end[0]][:selection_end[1]])[0]
-                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h - self.current_file.scroll, max(3, end - start), font_h))
+                        pygame.draw.rect(self.surf, selection_color, (start, (selection_start[0] + i) * font_h - self.current_file.scroll, max(3, end - start), font_h))
                     else:
                         start = LINE_INDEX_WIDTH + LINE_PAD
                         end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.current_file[selection_start[0] + i])[0]
-                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h - self.current_file.scroll, max(3, end - start), font_h))
+                        pygame.draw.rect(self.surf, selection_color, (start, (selection_start[0] + i) * font_h - self.current_file.scroll, max(3, end - start), font_h))
 
 
         

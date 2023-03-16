@@ -120,6 +120,8 @@ def main():
                         files_buttons[frame.file_index + 1].color = colorSum(frame.theme[0], (-10, -10, -10))
                         frame.file_index = button_down[0].tag
                         files_buttons[frame.file_index + 1].color = frame.theme[0]
+
+                        #frame.repeat_timer = REPEAT_TIMER #bug or feature?
                 
                 button_down = None
 
