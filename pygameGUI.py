@@ -50,7 +50,7 @@ class ImageButton:
 
 
 class TextButton:
-    def __init__(self,x,y,size,color, textColor, text, font):
+    def __init__(self,x,y,size,color, textColor, text, font, tag = 0):
         self.font = font
         self.x = x
         self.y = y
@@ -61,6 +61,7 @@ class TextButton:
         self.img = self.font.render(text,True,self.textColor)
         self.selected = False
         self.disabled = False
+        self.tag = tag
 
     def setText(self,text):
         self.text = text

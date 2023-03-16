@@ -33,7 +33,10 @@ def main():
 
     frame = NoteFrame((0, 32), (500, 500), DEFAULT_FONT, DEFAULT_THEME)
     #files bar
-    buttons = [ImageButton(LINE_INDEX_WIDTH//2,FILES_BAR_HEIGHT//2, (LINE_INDEX_WIDTH - 4, FILES_BAR_HEIGHT - 4), colorSum(frame.theme[0], (-5, -5, -5)), TOOLS[frame.tool], 0)]
+    buttons = [ImageButton(LINE_INDEX_WIDTH//2,FILES_BAR_HEIGHT//2, (LINE_INDEX_WIDTH - 4, FILES_BAR_HEIGHT - 4), colorSum(frame.theme[0], (-10, -10, -10)), TOOLS[frame.tool], -1)]
+    for i in range(len(frame.files)):
+        color = frame.theme[0] if i == frame.file_index else colorSum(frame.theme[0], (-10, -10, -10))
+        buttons.append(TextButton(LINE_INDEX_WIDTH + i* (100 + 2)+ 50, FILES_BAR_HEIGHT//2 + 1, (100, FILES_BAR_HEIGHT - 2),color, frame.theme[1], frame.files[i].title, GUI_FONT, i))
     button_down = None
 
     def draw():
@@ -51,7 +54,7 @@ def main():
                 pointer_img = 1
                 break
 
-        wn.fill(colorSum(frame.theme[0], (-15, -15, -15)))
+        wn.fill(colorSum(frame.theme[0], (-20, -20, -20)))
         #pygame.draw.rect(wn, colorSum(frame.theme[0], (-15, -15, -15)), (0, h - 16, w, h))
 
         frame.draw(wn)
@@ -61,7 +64,7 @@ def main():
             b.draw(wn, b is button_down)
 
         #bottom bar
-        line_col = GUI_FONT.render("Line: " + str(frame.cursor_line) + ", Column: " + str(frame.cursor_col), True, frame.theme[1])
+        line_col = GUI_FONT.render("Line: " + str(frame.files[frame.file_index].cursor_line) + ", Column: " + str(frame.files[frame.file_index].cursor_col), True, frame.theme[1])
         line_cnt = GUI_FONT.render(str(len(frame.files[frame.file_index])) + " line" + ("s" if len(frame.files[frame.file_index]) > 1 else ""), True, frame.theme[1])
         wn.blit(line_col, (LINE_PAD, wn.get_height() - 8 - line_col.get_height()/2))
         wn.blit(line_cnt, (wn.get_width() - LINE_PAD - line_cnt.get_width(), wn.get_height() - 8 - line_col.get_height()/2))
@@ -96,15 +99,20 @@ def main():
             
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 for b in buttons:
-                    if b.inTouch(mx, my):
+                    if b.tag != frame.file_index and b.inTouch(mx, my):
                         button_down = b
                         break
             
             elif event.type == pygame.MOUSEBUTTONUP:
                 if button_down and button_down.inTouch(mx, my):
-                    if button_down.tag == 0:
+                    if button_down.tag == -1: #tool
                         frame.tool = (frame.tool + 1) % len(TOOLS)
                         button_down.sprite = TOOLS[frame.tool]
+                    
+                    else:
+                        buttons[frame.file_index + 1].color = colorSum(frame.theme[0], (-10, -10, -10))
+                        frame.file_index = button_down.tag
+                        buttons[frame.file_index + 1].color = frame.theme[0]
                 
                 button_down = None
 
