@@ -1,7 +1,8 @@
 import pygame
 from pygameGUI import *
 import tkinter as tk #for clipboard
-import os
+import tkinter.filedialog
+import pickle
 
 pygame.init()
 pygame.font.init()
@@ -97,8 +98,8 @@ class NoteFrame:
         self.to_erase = None #TODO attenzione se si cambia file
 
     def print(self):
-        for i in range(len(self.files[self.file_index])):
-            print(self.files[self.file_index][i])
+        for i in range(len(self.current_file)):
+            print(self.current_file[i])
 
     def set_size(self, size):
         if size[0] < 1 or size[1] < 1 or (size[0] == self.w and size[1] == self.h):
@@ -107,46 +108,50 @@ class NoteFrame:
         self.surf = pygame.Surface(size)
         self.drawing_surf = pygame.Surface(size, pygame.SRCALPHA) #TODO make sure that the user cannot resize the window during drawing
 
+    @property
+    def current_file(self):
+        return self.files[self.file_index]
+
     def new_line(self):
-        if self.files[self.file_index].cursor_col < len(self.files[self.file_index][self.files[self.file_index].cursor_line]):
-            new_line_content = self.files[self.file_index][self.files[self.file_index].cursor_line][self.files[self.file_index].cursor_col:]
-            self.files[self.file_index].set_line(self.files[self.file_index].cursor_line, self.files[self.file_index][self.files[self.file_index].cursor_line][:self.files[self.file_index].cursor_col])
+        if self.current_file.cursor_col < len(self.current_file[self.current_file.cursor_line]):
+            new_line_content = self.current_file[self.current_file.cursor_line][self.current_file.cursor_col:]
+            self.current_file.set_line(self.current_file.cursor_line, self.current_file[self.current_file.cursor_line][:self.current_file.cursor_col])
         else:
             new_line_content = ""
         
         p = None
-        print("cursor", self.files[self.file_index].cursor_line, self.files[self.file_index].cursor_col, "lines:", len(self.files[self.file_index]))
-        if self.files[self.file_index].cursor_col > 0 and self.files[self.file_index][self.files[self.file_index].cursor_line][self.files[self.file_index].cursor_col - 1] in ('(', '[', '{'):
+        print("cursor", self.current_file.cursor_line, self.current_file.cursor_col, "lines:", len(self.current_file))
+        if self.current_file.cursor_col > 0 and self.current_file[self.current_file.cursor_line][self.current_file.cursor_col - 1] in ('(', '[', '{'):
             for par in ('(', '[', '{'):
-                if self.files[self.file_index][self.files[self.file_index].cursor_line][self.files[self.file_index].cursor_col - 1] == par:
+                if self.current_file[self.current_file.cursor_line][self.current_file.cursor_col - 1] == par:
                     new_line_content = (' ' * self.tab_size) + new_line_content
-                    self.files[self.file_index].cursor_col = self.tab_size
+                    self.current_file.cursor_col = self.tab_size
                     p = par
                     break
             
 
         else:
-            self.files[self.file_index].cursor_col = 0
-        self.files[self.file_index].cursor_line += 1
-        self.files[self.file_index].lines.insert(self.files[self.file_index].cursor_line, new_line_content)
-        if p and self.files[self.file_index].cursor_col < len(self.files[self.file_index][self.files[self.file_index].cursor_line]):
-            if self.files[self.file_index][self.files[self.file_index].cursor_line][self.files[self.file_index].cursor_col] == chr(ord(p) + 1 + int(p in ('[', '{'))):
-                temp_line, temp_col = self.files[self.file_index].cursor_line, self.files[self.file_index].cursor_col
+            self.current_file.cursor_col = 0
+        self.current_file.cursor_line += 1
+        self.current_file.lines.insert(self.current_file.cursor_line, new_line_content)
+        if p and self.current_file.cursor_col < len(self.current_file[self.current_file.cursor_line]):
+            if self.current_file[self.current_file.cursor_line][self.current_file.cursor_col] == chr(ord(p) + 1 + int(p in ('[', '{'))):
+                temp_line, temp_col = self.current_file.cursor_line, self.current_file.cursor_col
                 self.new_line()
-                self.files[self.file_index].cursor_line, self.files[self.file_index].cursor_col = temp_line, temp_col
+                self.current_file.cursor_line, self.current_file.cursor_col = temp_line, temp_col
 
     def delete_selection(self):
-        selection_start = self.files[self.file_index].selection_start
-        selection_end = self.files[self.file_index].selection_end
+        selection_start = self.current_file.selection_start
+        selection_end = self.current_file.selection_end
         #compare selection positions
         selection_start_pos = 0
         for i in range(selection_start[0]):
-            selection_start_pos += len(self.files[self.file_index][i])
+            selection_start_pos += len(self.current_file[i])
         selection_start_pos += selection_start[1]
 
         selection_end_pos = 0
         for i in range(selection_end[0]):
-            selection_end_pos += len(self.files[self.file_index][i])
+            selection_end_pos += len(self.current_file[i])
         selection_end_pos += selection_end[1]
 
         #put start and end in the correct order
@@ -157,22 +162,22 @@ class NoteFrame:
         if iter == 0:
             start = selection_start[1]
             end = selection_end[1]
-            self.files[self.file_index].set_line(selection_start[0], self.files[self.file_index][selection_start[0]][:start] + self.files[self.file_index][selection_start[0]][end:])
+            self.current_file.set_line(selection_start[0], self.current_file[selection_start[0]][:start] + self.current_file[selection_start[0]][end:])
             #TODO vedere se la linea adesso è vuota
-            self.files[self.file_index].selection_start = None
-            self.files[self.file_index].selection_end = None
-            self.files[self.file_index].cursor_col = start
+            self.current_file.selection_start = None
+            self.current_file.selection_end = None
+            self.current_file.cursor_col = start
         else:
-            self.files[self.file_index].set_line(selection_start[0], self.files[self.file_index][selection_start[0]][:selection_start[1]] + self.files[self.file_index][selection_end[0]][selection_end[1]:])
+            self.current_file.set_line(selection_start[0], self.current_file[selection_start[0]][:selection_start[1]] + self.current_file[selection_end[0]][selection_end[1]:])
 
             for i in range(iter ):
-                self.files[self.file_index].lines.pop(selection_start[0] + 1)
+                self.current_file.lines.pop(selection_start[0] + 1)
             
-            self.files[self.file_index].cursor_line = selection_start[0]
-            self.files[self.file_index].cursor_col = selection_start[1]
+            self.current_file.cursor_line = selection_start[0]
+            self.current_file.cursor_col = selection_start[1]
 
-        self.files[self.file_index].selection_start = None
-        self.files[self.file_index].selection_end = None
+        self.current_file.selection_start = None
+        self.current_file.selection_end = None
         
         #self.print()
 
@@ -189,114 +194,114 @@ class NoteFrame:
                 self.new_line()
 
             elif event.key == pygame.K_BACKSPACE: #backspace
-                selection_start = self.files[self.file_index].selection_start
-                selection_end = self.files[self.file_index].selection_end
+                selection_start = self.current_file.selection_start
+                selection_end = self.current_file.selection_end
                 if selection_start != selection_end and (selection_start and selection_end): #delete selection
                     self.delete_selection()
 
-                elif self.files[self.file_index].cursor_col == 0:
-                    if self.files[self.file_index].cursor_line > 0:
-                        removed_line = self.files[self.file_index][self.files[self.file_index].cursor_line]
-                        self.files[self.file_index].lines.pop(self.files[self.file_index].cursor_line)
-                        self.files[self.file_index].cursor_line -= 1
-                        self.files[self.file_index].cursor_col = len(self.files[self.file_index][self.files[self.file_index].cursor_line])
-                        self.files[self.file_index].set_line(self.files[self.file_index].cursor_line, self.files[self.file_index][self.files[self.file_index].cursor_line] + removed_line)
+                elif self.current_file.cursor_col == 0:
+                    if self.current_file.cursor_line > 0:
+                        removed_line = self.current_file[self.current_file.cursor_line]
+                        self.current_file.lines.pop(self.current_file.cursor_line)
+                        self.current_file.cursor_line -= 1
+                        self.current_file.cursor_col = len(self.current_file[self.current_file.cursor_line])
+                        self.current_file.set_line(self.current_file.cursor_line, self.current_file[self.current_file.cursor_line] + removed_line)
                 else:
                     if event.mod & pygame.KMOD_CTRL:
                         
-                        if self.files[self.file_index].cursor_col > 0:
-                            self.files[self.file_index].selection_start = [self.files[self.file_index].cursor_line, self.files[self.file_index].cursor_col]
-                            self.files[self.file_index].selection_end = (self.files[self.file_index].cursor_line, self.files[self.file_index].cursor_col)
-                            c = self.files[self.file_index][self.files[self.file_index].selection_start[0]][self.files[self.file_index].selection_start[1] - 1]
+                        if self.current_file.cursor_col > 0:
+                            self.current_file.selection_start = [self.current_file.cursor_line, self.current_file.cursor_col]
+                            self.current_file.selection_end = (self.current_file.cursor_line, self.current_file.cursor_col)
+                            c = self.current_file[self.current_file.selection_start[0]][self.current_file.selection_start[1] - 1]
                             if c == " ":
-                                self.files[self.file_index].selection_start[1] -= 1
+                                self.current_file.selection_start[1] -= 1
                             else:
-                                while c != " " and self.files[self.file_index].selection_start[1] > 0:
-                                    self.files[self.file_index].selection_start[1] -= 1
-                                    c = self.files[self.file_index][self.files[self.file_index].selection_start[0]][self.files[self.file_index].selection_start[1] - 1]
-                            self.files[self.file_index].cursor_col = self.files[self.file_index].selection_start[1]
+                                while c != " " and self.current_file.selection_start[1] > 0:
+                                    self.current_file.selection_start[1] -= 1
+                                    c = self.current_file[self.current_file.selection_start[0]][self.current_file.selection_start[1] - 1]
+                            self.current_file.cursor_col = self.current_file.selection_start[1]
                             self.delete_selection()
                     else:
-                        self.files[self.file_index].set_line(self.files[self.file_index].cursor_line, self.files[self.file_index][self.files[self.file_index].cursor_line][:self.files[self.file_index].cursor_col - 1] + self.files[self.file_index][self.files[self.file_index].cursor_line][self.files[self.file_index].cursor_col:])
-                        self.files[self.file_index].cursor_col -= 1
+                        self.current_file.set_line(self.current_file.cursor_line, self.current_file[self.current_file.cursor_line][:self.current_file.cursor_col - 1] + self.current_file[self.current_file.cursor_line][self.current_file.cursor_col:])
+                        self.current_file.cursor_col -= 1
 
                 #scroll to cursor
-                if self.files[self.file_index].cursor_line < self.files[self.file_index].scroll//font_h or self.files[self.file_index].cursor_line > self.files[self.file_index].scroll//font_h + self.h/font_h:
-                    self.files[self.file_index].scroll = self.files[self.file_index].cursor_line * font_h
+                if self.current_file.cursor_line < self.current_file.scroll//font_h or self.current_file.cursor_line > self.current_file.scroll//font_h + self.h/font_h:
+                    self.current_file.scroll = self.current_file.cursor_line * font_h
             
             elif event.key == pygame.K_DELETE:
-                selection_start = self.files[self.file_index].selection_start
-                selection_end = self.files[self.file_index].selection_end
+                selection_start = self.current_file.selection_start
+                selection_end = self.current_file.selection_end
                 if selection_start != selection_end and (selection_start and selection_end): #delete selection
                     self.delete_selection()
 
-                elif self.files[self.file_index].cursor_col == len(self.files[self.file_index][self.files[self.file_index].cursor_line]):
-                    if self.files[self.file_index].cursor_line < len(self.files[self.file_index]) - 1:
-                        removed_line = self.files[self.file_index][self.files[self.file_index].cursor_line + 1]
-                        self.files[self.file_index].lines.pop(self.files[self.file_index].cursor_line + 1)
-                        self.files[self.file_index].set_line(self.files[self.file_index].cursor_line, self.files[self.file_index][self.files[self.file_index].cursor_line] + removed_line)
+                elif self.current_file.cursor_col == len(self.current_file[self.current_file.cursor_line]):
+                    if self.current_file.cursor_line < len(self.current_file) - 1:
+                        removed_line = self.current_file[self.current_file.cursor_line + 1]
+                        self.current_file.lines.pop(self.current_file.cursor_line + 1)
+                        self.current_file.set_line(self.current_file.cursor_line, self.current_file[self.current_file.cursor_line] + removed_line)
                 else:
-                    self.files[self.file_index].set_line(self.files[self.file_index].cursor_line, self.files[self.file_index][self.files[self.file_index].cursor_line][:self.files[self.file_index].cursor_col] + self.files[self.file_index][self.files[self.file_index].cursor_line][self.files[self.file_index].cursor_col + 1:])
+                    self.current_file.set_line(self.current_file.cursor_line, self.current_file[self.current_file.cursor_line][:self.current_file.cursor_col] + self.current_file[self.current_file.cursor_line][self.current_file.cursor_col + 1:])
 
             
             elif event.key == pygame.K_RIGHT:
                 if event.mod & pygame.KMOD_CTRL:
-                    if self.files[self.file_index].cursor_col < len(self.files[self.file_index][self.files[self.file_index].cursor_line]):
-                        c = self.files[self.file_index][self.files[self.file_index].cursor_line][self.files[self.file_index].cursor_col]
+                    if self.current_file.cursor_col < len(self.current_file[self.current_file.cursor_line]):
+                        c = self.current_file[self.current_file.cursor_line][self.current_file.cursor_col]
                         if c == " ":
-                            self.files[self.file_index].cursor_col += 1
+                            self.current_file.cursor_col += 1
                         else:
-                            while c != " " and self.files[self.file_index].cursor_col < len(self.files[self.file_index][self.files[self.file_index].cursor_line]):
-                                self.files[self.file_index].cursor_col += 1
-                                if self.files[self.file_index].cursor_col < len(self.files[self.file_index][self.files[self.file_index].cursor_line]):
-                                    c = self.files[self.file_index][self.files[self.file_index].cursor_line][self.files[self.file_index].cursor_col]
+                            while c != " " and self.current_file.cursor_col < len(self.current_file[self.current_file.cursor_line]):
+                                self.current_file.cursor_col += 1
+                                if self.current_file.cursor_col < len(self.current_file[self.current_file.cursor_line]):
+                                    c = self.current_file[self.current_file.cursor_line][self.current_file.cursor_col]
                             
                 else:
-                    self.files[self.file_index].cursor_col += 1
-                    if self.files[self.file_index].cursor_col > len(self.files[self.file_index][self.files[self.file_index].cursor_line]):
-                        self.files[self.file_index].cursor_line += 1
-                        if self.files[self.file_index].cursor_line >= len(self.files[self.file_index]):
-                            self.files[self.file_index].cursor_line = len(self.files[self.file_index]) - 1
-                            self.files[self.file_index].cursor_col = len(self.files[self.file_index][self.files[self.file_index].cursor_line])
+                    self.current_file.cursor_col += 1
+                    if self.current_file.cursor_col > len(self.current_file[self.current_file.cursor_line]):
+                        self.current_file.cursor_line += 1
+                        if self.current_file.cursor_line >= len(self.current_file):
+                            self.current_file.cursor_line = len(self.current_file) - 1
+                            self.current_file.cursor_col = len(self.current_file[self.current_file.cursor_line])
                             return
-                        self.files[self.file_index].cursor_col = 0
+                        self.current_file.cursor_col = 0
 
             elif event.key == pygame.K_LEFT:
                 if event.mod & pygame.KMOD_CTRL:
-                    if self.files[self.file_index].cursor_col > 0:
-                        c = self.files[self.file_index][self.files[self.file_index].cursor_line][self.files[self.file_index].cursor_col - 1]
+                    if self.current_file.cursor_col > 0:
+                        c = self.current_file[self.current_file.cursor_line][self.current_file.cursor_col - 1]
                         if c == " ":
-                            self.files[self.file_index].cursor_col -= 1
+                            self.current_file.cursor_col -= 1
                         else:
-                            while c != " " and self.files[self.file_index].cursor_col > 0:
-                                self.files[self.file_index].cursor_col -= 1
-                                c = self.files[self.file_index][self.files[self.file_index].cursor_line][self.files[self.file_index].cursor_col - 1]
+                            while c != " " and self.current_file.cursor_col > 0:
+                                self.current_file.cursor_col -= 1
+                                c = self.current_file[self.current_file.cursor_line][self.current_file.cursor_col - 1]
                 else:
-                    self.files[self.file_index].cursor_col -= 1
-                    if self.files[self.file_index].cursor_col < 0:
-                        self.files[self.file_index].cursor_line -= 1
-                        if self.files[self.file_index].cursor_line < 0:
-                            self.files[self.file_index].cursor_line = 0
-                            self.files[self.file_index].cursor_col = 0
+                    self.current_file.cursor_col -= 1
+                    if self.current_file.cursor_col < 0:
+                        self.current_file.cursor_line -= 1
+                        if self.current_file.cursor_line < 0:
+                            self.current_file.cursor_line = 0
+                            self.current_file.cursor_col = 0
                             return
-                        self.files[self.file_index].cursor_col = len(self.files[self.file_index][self.files[self.file_index].cursor_line])
+                        self.current_file.cursor_col = len(self.current_file[self.current_file.cursor_line])
 
 
             elif event.key == pygame.K_UP:
-                self.files[self.file_index].cursor_line -= 1
-                if self.files[self.file_index].cursor_line < 0:
-                    self.files[self.file_index].cursor_line = 0
+                self.current_file.cursor_line -= 1
+                if self.current_file.cursor_line < 0:
+                    self.current_file.cursor_line = 0
                 else:
-                    if self.files[self.file_index].cursor_col > len(self.files[self.file_index][self.files[self.file_index].cursor_line]):
-                        self.files[self.file_index].cursor_col = len(self.files[self.file_index][self.files[self.file_index].cursor_line])
+                    if self.current_file.cursor_col > len(self.current_file[self.current_file.cursor_line]):
+                        self.current_file.cursor_col = len(self.current_file[self.current_file.cursor_line])
 
             elif event.key == pygame.K_DOWN:
-                self.files[self.file_index].cursor_line += 1
-                if self.files[self.file_index].cursor_line > len(self.files[self.file_index]) - 1:
-                    self.files[self.file_index].cursor_line = len(self.files[self.file_index]) - 1
+                self.current_file.cursor_line += 1
+                if self.current_file.cursor_line > len(self.current_file) - 1:
+                    self.current_file.cursor_line = len(self.current_file) - 1
                 else:
-                    if self.files[self.file_index].cursor_col > len(self.files[self.file_index][self.files[self.file_index].cursor_line]):
-                        self.files[self.file_index].cursor_col = len(self.files[self.file_index][self.files[self.file_index].cursor_line])
+                    if self.current_file.cursor_col > len(self.current_file[self.current_file.cursor_line]):
+                        self.current_file.cursor_col = len(self.current_file[self.current_file.cursor_line])
 
             
                 
@@ -313,48 +318,51 @@ class NoteFrame:
                         self.new_line()
                         continue
                     if c == '\t':
-                       self.files[self.file_index].set_line(self.files[self.file_index].cursor_line, self.files[self.file_index][self.files[self.file_index].cursor_line][:self.files[self.file_index].cursor_col] + tab + self.files[self.file_index][self.files[self.file_index].cursor_line][self.files[self.file_index].cursor_col:])
-                       self.files[self.file_index].cursor_col += self.tab_size - 1
+                       self.current_file.set_line(self.current_file.cursor_line, self.current_file[self.current_file.cursor_line][:self.current_file.cursor_col] + tab + self.current_file[self.current_file.cursor_line][self.current_file.cursor_col:])
+                       self.current_file.cursor_col += self.tab_size - 1
                     else:
-                        self.files[self.file_index].set_line(self.files[self.file_index].cursor_line, self.files[self.file_index][self.files[self.file_index].cursor_line][:self.files[self.file_index].cursor_col] + c + self.files[self.file_index][self.files[self.file_index].cursor_line][self.files[self.file_index].cursor_col:])
-                    self.files[self.file_index].cursor_col += 1
+                        self.current_file.set_line(self.current_file.cursor_line, self.current_file[self.current_file.cursor_line][:self.current_file.cursor_col] + c + self.current_file[self.current_file.cursor_line][self.current_file.cursor_col:])
+                    self.current_file.cursor_col += 1
                 
                 #scroll to cursor
-                if self.files[self.file_index].cursor_line < self.files[self.file_index].scroll//font_h or self.files[self.file_index].cursor_line > self.files[self.file_index].scroll//font_h + self.h/font_h:
-                    self.files[self.file_index].scroll = self.files[self.file_index].cursor_line * font_h
+                if self.current_file.cursor_line < self.current_file.scroll//font_h or self.current_file.cursor_line > self.current_file.scroll//font_h + self.h/font_h:
+                    self.current_file.scroll = self.current_file.cursor_line * font_h
 
             elif (event.key == pygame.K_a) and (event.mod & pygame.KMOD_CTRL): #CTRL A
-                self.files[self.file_index].selection_start = (0, 0)
-                self.files[self.file_index].selection_end = (len(self.files[self.file_index]) - 1, len(self.files[self.file_index][-1]))
-                self.files[self.file_index].cursor_line = len(self.files[self.file_index]) - 1
-                self.files[self.file_index].cursor_col = len(self.files[self.file_index][self.files[self.file_index].cursor_line])
+                self.current_file.selection_start = (0, 0)
+                self.current_file.selection_end = (len(self.current_file) - 1, len(self.current_file[-1]))
+                self.current_file.cursor_line = len(self.current_file) - 1
+                self.current_file.cursor_col = len(self.current_file[self.current_file.cursor_line])
 
 
-            elif (event.key == pygame.K_s) and (event.mod & pygame.KMOD_CTRL):
+            elif (event.key == pygame.K_s) and (event.mod & pygame.KMOD_CTRL): #CTRL S
                 self.save()
+            
+            elif (event.key == pygame.K_o) and (event.mod & pygame.KMOD_CTRL): #CTRL O
+                self.load()
 
             elif event.key == 9: #tab
-                self.files[self.file_index].set_line(self.files[self.file_index].cursor_line, self.files[self.file_index][self.files[self.file_index].cursor_line][:self.files[self.file_index].cursor_col] + "    " + self.files[self.file_index][self.files[self.file_index].cursor_line][self.files[self.file_index].cursor_col:])
-                self.files[self.file_index].cursor_col += 4
+                self.current_file.set_line(self.current_file.cursor_line, self.current_file[self.current_file.cursor_line][:self.current_file.cursor_col] + "    " + self.current_file[self.current_file.cursor_line][self.current_file.cursor_col:])
+                self.current_file.cursor_col += 4
 
             else:
                 self.cursor_color_swap_timer = CURSOR_COLOR_SWAP_TIMER
 
-                selection_start = self.files[self.file_index].selection_start
-                selection_end = self.files[self.file_index].selection_end
+                selection_start = self.current_file.selection_start
+                selection_end = self.current_file.selection_end
                 if selection_start != selection_end and (selection_start and selection_end): #delete selection
                     self.delete_selection()
 
-                temp = len(self.files[self.file_index][self.files[self.file_index].cursor_line])
+                temp = len(self.current_file[self.current_file.cursor_line])
                 new = event.unicode
                 for par in ('(', '[', '{'):
                     if new == par:
                         new += chr(ord(par) + 1 + int(par in ('[', '{')))
                         break
 
-                self.files[self.file_index].set_line(self.files[self.file_index].cursor_line, self.files[self.file_index][self.files[self.file_index].cursor_line][:self.files[self.file_index].cursor_col] + new + self.files[self.file_index][self.files[self.file_index].cursor_line][self.files[self.file_index].cursor_col:])
-                if len(self.files[self.file_index][self.files[self.file_index].cursor_line]) > temp:
-                    self.files[self.file_index].cursor_col += 1
+                self.current_file.set_line(self.current_file.cursor_line, self.current_file[self.current_file.cursor_line][:self.current_file.cursor_col] + new + self.current_file[self.current_file.cursor_line][self.current_file.cursor_col:])
+                if len(self.current_file[self.current_file.cursor_line]) > temp:
+                    self.current_file.cursor_col += 1
         
 
         elif event.type == pygame.KEYUP:
@@ -367,24 +375,24 @@ class NoteFrame:
                 if FILES_BAR_HEIGHT <= my < self.h:
                     if self.tool == TOOL_CURSOR:
                         font_h = self.font.size('|')[1]
-                        self.files[self.file_index].cursor_line = rel_my // font_h
-                        if self.files[self.file_index].cursor_line >= len(self.files[self.file_index]):
-                            self.files[self.file_index].cursor_line = len(self.files[self.file_index]) - 1
-                            self.files[self.file_index].cursor_col = len(self.files[self.file_index][self.files[self.file_index].cursor_line])
+                        self.current_file.cursor_line = rel_my // font_h
+                        if self.current_file.cursor_line >= len(self.current_file):
+                            self.current_file.cursor_line = len(self.current_file) - 1
+                            self.current_file.cursor_col = len(self.current_file[self.current_file.cursor_line])
                         else:    
                             mrow = 0
                             mx_cpy = rel_mx
-                            for c in self.files[self.file_index][self.files[self.file_index].cursor_line]:
+                            for c in self.current_file[self.current_file.cursor_line]:
                                 mx_cpy -= self.font.size(c)[0]
                                 if mx_cpy < 0:
                                     break
                                 mrow += 1
                             
-                            self.files[self.file_index].cursor_col = mrow
+                            self.current_file.cursor_col = mrow
 
                         self.selecting = True
-                        self.files[self.file_index].selection_start = (self.files[self.file_index].cursor_line, self.files[self.file_index].cursor_col)
-                        self.files[self.file_index].selection_end = None
+                        self.current_file.selection_start = (self.current_file.cursor_line, self.current_file.cursor_col)
+                        self.current_file.selection_end = None
                     
                     elif self.tool == TOOL_BRUSH:
                         self.prev_mx, self.prev_my = mx - self.x, my - self.y
@@ -403,17 +411,17 @@ class NoteFrame:
                     
                     elif self.tool == TOOL_ERASER:
                         if self.to_erase:
-                            self.files[self.file_index].images.remove(self.to_erase)
+                            self.current_file.images.remove(self.to_erase)
             
             #TODO fluid scrolling
             elif event.button == 4: #up
                     if not self.drawing:
-                        self.files[self.file_index].scroll -= font_h*3
-                        if self.files[self.file_index].scroll < 0:
-                            self.files[self.file_index].scroll = 0
+                        self.current_file.scroll -= font_h*3
+                        if self.current_file.scroll < 0:
+                            self.current_file.scroll = 0
             elif event.button == 5: #down
                     if not self.drawing:
-                        self.files[self.file_index].scroll += font_h*3
+                        self.current_file.scroll += font_h*3
             
             
 
@@ -421,14 +429,14 @@ class NoteFrame:
             if event.button == 1:
                 if self.tool == TOOL_CURSOR:
                     self.selecting = False
-                    self.files[self.file_index].selection_end = (self.files[self.file_index].cursor_line, self.files[self.file_index].cursor_col)
+                    self.current_file.selection_end = (self.current_file.cursor_line, self.current_file.cursor_col)
                 elif self.tool == TOOL_BRUSH:
                     if self.drawing_bbox:
                         size = (self.drawing_bbox[2] - self.drawing_bbox[0] + 2, self.drawing_bbox[3] - self.drawing_bbox[1] + 2)
                         s = pygame.Surface(size, pygame.SRCALPHA)
                         s.blit(self.drawing_surf, (-self.drawing_bbox[0], -self.drawing_bbox[1]))
-                        img = NoteImg(s, (self.drawing_bbox[0], self.drawing_bbox[1] + self.files[self.file_index].scroll))
-                        self.files[self.file_index].images.append(img)
+                        img = NoteImg(s, (self.drawing_bbox[0], self.drawing_bbox[1] + self.current_file.scroll))
+                        self.current_file.images.append(img)
 
                         self.drawing_bbox = None
                         
@@ -441,7 +449,7 @@ class NoteFrame:
     def listen(self, events, mx, my):
         #get mouse position relative to the frame (excluding the indices column)
         rel_mx = mx - self.x - LINE_INDEX_WIDTH - LINE_PAD
-        rel_my = my - self.y + self.files[self.file_index].scroll
+        rel_my = my - self.y + self.current_file.scroll
 
 
         if rel_mx > - LINE_PAD:
@@ -452,27 +460,27 @@ class NoteFrame:
 
         font_h = self.font.size('|')[1]
         if self.selecting:
-            self.files[self.file_index].cursor_line = rel_my // font_h
+            self.current_file.cursor_line = rel_my // font_h
 
-            if self.files[self.file_index].cursor_line < 0:
-                self.files[self.file_index].cursor_line = 0
-            elif self.files[self.file_index].cursor_line >= len(self.files[self.file_index]):
-                self.files[self.file_index].cursor_line = len(self.files[self.file_index]) - 1
-                self.files[self.file_index].cursor_col = len(self.files[self.file_index][self.files[self.file_index].cursor_line])
+            if self.current_file.cursor_line < 0:
+                self.current_file.cursor_line = 0
+            elif self.current_file.cursor_line >= len(self.current_file):
+                self.current_file.cursor_line = len(self.current_file) - 1
+                self.current_file.cursor_col = len(self.current_file[self.current_file.cursor_line])
     
                 
             else:
                 mrow = 0
                 mx_cpy = rel_mx
-                for c in self.files[self.file_index][self.files[self.file_index].cursor_line]:
+                for c in self.current_file[self.current_file.cursor_line]:
                     mx_cpy -= self.font.size(c)[0]
                     if mx_cpy < 0:
                         break
                     mrow += 1
                 
-                self.files[self.file_index].cursor_col = mrow
+                self.current_file.cursor_col = mrow
             
-            self.files[self.file_index].selection_end = (self.files[self.file_index].cursor_line, self.files[self.file_index].cursor_col)
+            self.current_file.selection_end = (self.current_file.cursor_line, self.current_file.cursor_col)
 
 
         elif self.drawing:
@@ -495,7 +503,7 @@ class NoteFrame:
         #to erase
         self.to_erase = None
         if self.tool == TOOL_ERASER:
-            for img in self.files[self.file_index].images[::-1]:
+            for img in self.current_file.images[::-1]:
                 rel_mx2 = mx - self.x
                 if rel_mx2 >= img.x and rel_mx2 <= img.x + img.surface.get_width()  and  rel_my >= img.y and rel_my <= img.y + img.surface.get_height():
                     self.to_erase = img
@@ -519,10 +527,10 @@ class NoteFrame:
         for event in events:
             self.handle_input(event, mx, my, rel_mx, rel_my, font_h)
 
-        if self.files[self.file_index].scroll > font_h * (len(self.files[self.file_index]) - 1):
-            self.files[self.file_index].scroll = font_h * (len(self.files[self.file_index]) - 1)
+        if self.current_file.scroll > font_h * (len(self.current_file) - 1):
+            self.current_file.scroll = font_h * (len(self.current_file) - 1)
 
-        #if self.files[self.file_index].cursor_line < self.files[self.file_index].scroll//font_h or self.files[self.file_index].cursor_line > self.files[self.file_index].scroll//font_h + self.h/:
+        #if self.current_file.cursor_line < self.current_file.scroll//font_h or self.current_file.cursor_line > self.current_file.scroll//font_h + self.h/:
     
         return pointer_img
 
@@ -534,21 +542,21 @@ class NoteFrame:
 
         #to erase
         if self.to_erase:
-            pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (self.to_erase.x, self.to_erase.y - self.files[self.file_index].scroll, *self.to_erase.surface.get_size()))
+            pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (self.to_erase.x, self.to_erase.y - self.current_file.scroll, *self.to_erase.surface.get_size()))
 
         #selection
-        selection_start = self.files[self.file_index].selection_start
-        selection_end = self.files[self.file_index].selection_end
+        selection_start = self.current_file.selection_start
+        selection_end = self.current_file.selection_end
         if selection_start != selection_end and (selection_start and selection_end):
             #compare selection positions
             selection_start_pos = 0
             for i in range(selection_start[0]):
-                selection_start_pos += len(self.files[self.file_index][i])
+                selection_start_pos += len(self.current_file[i])
             selection_start_pos += selection_start[1]
 
             selection_end_pos = 0
             for i in range(selection_end[0]):
-                selection_end_pos += len(self.files[self.file_index][i])
+                selection_end_pos += len(self.current_file[i])
             selection_end_pos += selection_end[1]
 
             #put start and end in the correct order
@@ -559,39 +567,39 @@ class NoteFrame:
             iter = selection_end[0] - selection_start[0] + 1
             if iter == 1:
                 #find selection start and end in pixels
-                start = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.files[self.file_index][selection_start[0]][:selection_start[1]])[0]
-                end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.files[self.file_index][selection_end[0]][:selection_end[1]])[0]
-                pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, selection_start[0] * font_h - self.files[self.file_index].scroll, max(3, end - start), font_h))
+                start = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.current_file[selection_start[0]][:selection_start[1]])[0]
+                end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.current_file[selection_end[0]][:selection_end[1]])[0]
+                pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, selection_start[0] * font_h - self.current_file.scroll, max(3, end - start), font_h))
             else:
                 for i in range(iter):
                     if i == 0:
-                        start = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.files[self.file_index][selection_start[0] + i][:selection_start[1]])[0]
-                        end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.files[self.file_index][selection_start[0] + i])[0]
-                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h - self.files[self.file_index].scroll, max(3, end - start), font_h))
+                        start = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.current_file[selection_start[0] + i][:selection_start[1]])[0]
+                        end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.current_file[selection_start[0] + i])[0]
+                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h - self.current_file.scroll, max(3, end - start), font_h))
                     elif i == iter - 1:
                         start = LINE_INDEX_WIDTH + LINE_PAD
-                        end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.files[self.file_index][selection_end[0]][:selection_end[1]])[0]
-                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h - self.files[self.file_index].scroll, max(3, end - start), font_h))
+                        end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.current_file[selection_end[0]][:selection_end[1]])[0]
+                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h - self.current_file.scroll, max(3, end - start), font_h))
                     else:
                         start = LINE_INDEX_WIDTH + LINE_PAD
-                        end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.files[self.file_index][selection_start[0] + i])[0]
-                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h - self.files[self.file_index].scroll, max(3, end - start), font_h))
+                        end = LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.current_file[selection_start[0] + i])[0]
+                        pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (start, (selection_start[0] + i) * font_h - self.current_file.scroll, max(3, end - start), font_h))
 
 
         
 
-        #print("range: ", (max(self.files[self.file_index].scroll//font_h - 1, 0), min(self.files[self.file_index].scroll//font_h + self.h//font_h + 1 ,len(self.files[self.file_index]))))
+        #print("range: ", (max(self.current_file.scroll//font_h - 1, 0), min(self.current_file.scroll//font_h + self.h//font_h + 1 ,len(self.current_file))))
 
 
         #text
-        for i in range(max(self.files[self.file_index].scroll//font_h - 1, 0), min(self.files[self.file_index].scroll//font_h + self.h//font_h + 1 ,len(self.files[self.file_index]))):
-            text = self.font.render(str(self.files[self.file_index][i]), True, self.theme[1])
-            self.surf.blit(text, (LINE_INDEX_WIDTH + LINE_PAD, font_h * i + font_h//2 - text.get_height()//2 - self.files[self.file_index].scroll))
+        for i in range(max(self.current_file.scroll//font_h - 1, 0), min(self.current_file.scroll//font_h + self.h//font_h + 1 ,len(self.current_file))):
+            text = self.font.render(str(self.current_file[i]), True, self.theme[1])
+            self.surf.blit(text, (LINE_INDEX_WIDTH + LINE_PAD, font_h * i + font_h//2 - text.get_height()//2 - self.current_file.scroll))
 
         #images
-        for i in range(len(self.files[self.file_index].images)):
-            img = self.files[self.file_index].images[i]
-            self.surf.blit(img.surface, (img.x, img.y - self.files[self.file_index].scroll))
+        for i in range(len(self.current_file.images)):
+            img = self.current_file.images[i]
+            self.surf.blit(img.surface, (img.x, img.y - self.current_file.scroll))
 
         #cursor
         if self.cursor_color_swap_timer <= 0:
@@ -604,23 +612,57 @@ class NoteFrame:
         self.cursor_color_swap_timer -= 1
 
         try:
-            pygame.draw.rect(self.surf, self.cursor_color, (LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.files[self.file_index][self.files[self.file_index].cursor_line][:self.files[self.file_index].cursor_col])[0], font_h*self.files[self.file_index].cursor_line -self.files[self.file_index].scroll,  1, font_h ))
+            pygame.draw.rect(self.surf, self.cursor_color, (LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.current_file[self.current_file.cursor_line][:self.current_file.cursor_col])[0], font_h*self.current_file.cursor_line -self.current_file.scroll,  1, font_h ))
         except:
-            print("line",self.files[self.file_index].cursor_line)
+            print("line",self.current_file.cursor_line)
         self.surf.blit(self.drawing_surf, (0, 0))
 
         #indices
         pygame.draw.rect(self.surf, colorSum(self.theme[0], (-5, -5, -5)), (0, 0, LINE_INDEX_WIDTH, self.h))
-        for i in range(max(self.files[self.file_index].scroll//font_h - 1, 0), min(self.files[self.file_index].scroll//font_h + self.h//font_h + 1 ,len(self.files[self.file_index]))):
+        for i in range(max(self.current_file.scroll//font_h - 1, 0), min(self.current_file.scroll//font_h + self.h//font_h + 1 ,len(self.current_file))):
             index = self.font.render(str(i), True, colorSum(self.theme[1], (-50, -50, -50)))
-            self.surf.blit(index, (LINE_INDEX_WIDTH//2 - index.get_width()//2, font_h * i + font_h//2 - index.get_height()//2 - self.files[self.file_index].scroll))
+            self.surf.blit(index, (LINE_INDEX_WIDTH//2 - index.get_width()//2, font_h * i + font_h//2 - index.get_height()//2 - self.current_file.scroll))
 
         surface.blit(self.surf, (self.x, self.y))
 
 
     def save(self):
-        with open("save.txt", "w") as f:
-            for line in self.files[self.file_index]:
-                f.write(line + '\n')
-            
-            f.close()
+        filename = tkinter.filedialog.asksaveasfilename(defaultextension = ".anyn", initialfile = self.current_file.title + ".anyn")
+        if '/' in filename:
+            filename = filename.split('/')[-1]
+        
+        print("filename", filename)
+
+        f = open(filename, 'wb')
+
+        to_save = NoteFile(lines = self.current_file.lines, title = '')
+
+        
+        for img in self.current_file.images:
+            pixels = pygame.surfarray.array3d(img.surface)
+            img_ = NoteImg(pixels, (img.x, img.y))
+            to_save.images.append(img_)
+        
+        pickle.dump(to_save, f)
+
+        f.close()
+    
+    
+    def load(self):
+        filename = tkinter.filedialog.askopenfilenames()[0]
+        if '/' in filename:
+            filename = filename.split('/')[-1]
+        print("filename", filename)
+        f = open(filename, 'rb')
+        to_load = pickle.load(f)
+        to_load.title = filename.replace(".anyn", "")
+
+        images = []
+        for _img in to_load.images:
+            img = NoteImg(pygame.surfarray.make_surface(_img.surface), (_img.x, _img.y))
+            images.append(img)
+        
+        to_load.images = images
+        
+        #TODO insert file in self.files
+        

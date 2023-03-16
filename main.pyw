@@ -2,6 +2,7 @@ from AnyNote import *
 
 import win32gui #for refresh during resize
 import win32con #
+import os
 
 def wndProc(oldWndProc, draw_callback, hWnd, message, wParam, lParam):
     if message == win32con.WM_SIZE:
@@ -33,10 +34,10 @@ def main():
 
     frame = NoteFrame((0, 32), (500, 500), DEFAULT_FONT, DEFAULT_THEME)
     #files bar
-    buttons = [ImageButton(LINE_INDEX_WIDTH//2,FILES_BAR_HEIGHT//2, (LINE_INDEX_WIDTH - 4, FILES_BAR_HEIGHT - 4), colorSum(frame.theme[0], (-10, -10, -10)), TOOLS[frame.tool], -1)]
+    files_buttons = [ImageButton(LINE_INDEX_WIDTH//2,FILES_BAR_HEIGHT//2, (LINE_INDEX_WIDTH - 4, FILES_BAR_HEIGHT - 4), colorSum(frame.theme[0], (-10, -10, -10)), TOOLS[frame.tool], -1)]
     for i in range(len(frame.files)):
         color = frame.theme[0] if i == frame.file_index else colorSum(frame.theme[0], (-10, -10, -10))
-        buttons.append(TextButton(LINE_INDEX_WIDTH + i* (100 + 2)+ 50, FILES_BAR_HEIGHT//2 + 1, (100, FILES_BAR_HEIGHT - 2),color, frame.theme[1], frame.files[i].title, GUI_FONT, i))
+        files_buttons.append(TextButton(LINE_INDEX_WIDTH + i* (100 + 2)+ 50, FILES_BAR_HEIGHT//2 + 1, (100, FILES_BAR_HEIGHT - 2),color, frame.theme[1], frame.files[i].title, GUI_FONT, i))
     button_down = None
 
     def draw():
@@ -49,7 +50,7 @@ def main():
         if my < 32 or my > frame.y + frame.h:
             pointer_img = 0
 
-        for b in buttons:
+        for b in files_buttons:
             if b.inTouch(mx, my):
                 pointer_img = 1
                 break
@@ -60,8 +61,8 @@ def main():
         frame.draw(wn)
 
         #files bar
-        for b in buttons:
-            b.draw(wn, b is button_down)
+        for b in files_buttons:
+            b.draw(wn, b is button_down[0] if button_down else False)
 
         #bottom bar
         line_col = GUI_FONT.render("Line: " + str(frame.files[frame.file_index].cursor_line) + ", Column: " + str(frame.files[frame.file_index].cursor_col), True, frame.theme[1])
@@ -98,21 +99,27 @@ def main():
                 #pygame.display.set_icon(pygame.image.load("icon.png").convert_alpha())
             
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                for b in buttons:
-                    if b.tag != frame.file_index and b.inTouch(mx, my):
-                        button_down = b
-                        break
+                if event.button in (1, 3, 4, 5):
+                    for b in files_buttons:
+                        if b.tag != frame.file_index and b.inTouch(mx, my):
+                            button_down = (b, event.button)
+                            break
             
             elif event.type == pygame.MOUSEBUTTONUP:
-                if button_down and button_down.inTouch(mx, my):
-                    if button_down.tag == -1: #tool
-                        frame.tool = (frame.tool + 1) % len(TOOLS)
-                        button_down.sprite = TOOLS[frame.tool]
+                if button_down and button_down[0].inTouch(mx, my):
+                    if button_down[0].tag == -1: #tool
+                        increment = 0
+                        if button_down[1] == 1 or button_down[1] == 4:
+                            increment = 1
+                        elif button_down[1] == 3 or button_down[1] == 5:
+                            increment = -1
+                        frame.tool = (frame.tool + increment) % len(TOOLS)
+                        button_down[0].sprite = TOOLS[frame.tool]
                     
                     else:
-                        buttons[frame.file_index + 1].color = colorSum(frame.theme[0], (-10, -10, -10))
-                        frame.file_index = button_down.tag
-                        buttons[frame.file_index + 1].color = frame.theme[0]
+                        files_buttons[frame.file_index + 1].color = colorSum(frame.theme[0], (-10, -10, -10))
+                        frame.file_index = button_down[0].tag
+                        files_buttons[frame.file_index + 1].color = frame.theme[0]
                 
                 button_down = None
 
