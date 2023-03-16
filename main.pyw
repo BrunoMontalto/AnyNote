@@ -48,7 +48,7 @@ def main():
 
         for b in buttons:
             if b.inTouch(mx, my):
-                pointer_img = 3
+                pointer_img = 1
                 break
 
         wn.fill(colorSum(frame.theme[0], (-15, -15, -15)))

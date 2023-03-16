@@ -18,6 +18,7 @@ DEFAULT_THEME = [(70, 70, 70), (250, 250, 250)]
 
 TOOL_CURSOR = 0
 TOOL_BRUSH = 1
+TOOL_ERASER = 2
 
 CURSOR_COLOR_SWAP_TIMER = 30
 REPEAT_TIMER = 30
@@ -87,6 +88,7 @@ class NoteFrame:
         self.prev_mx, self.prev_my = None, None
         self.drawing_bbox = None
         self.drawing_surf = pygame.Surface(size, pygame.SRCALPHA) #stores what the user is drawing temporarily
+        self.to_erase = None #TODO attenzione se si cambia file
 
     def print(self):
         for i in range(len(self.files[self.file_index])):
@@ -391,6 +393,10 @@ class NoteFrame:
                         if self.prev_my > self.drawing_bbox[3]:
                             self.drawing_bbox[3] = self.prev_my
                         self.drawing = True
+                    
+                    elif self.tool == TOOL_ERASER:
+                        if self.to_erase:
+                            self.files[self.file_index].images.remove(self.to_erase)
             
             #TODO fluid scrolling
             elif event.button == 4: #up
@@ -432,16 +438,22 @@ class NoteFrame:
 
 
         if rel_mx > - LINE_PAD:
-            pointer_img = self.tool + 1
+            pointer_img = self.tool + 2
         else:
             pointer_img = 0
+
 
         font_h = self.font.size('|')[1]
         if self.selecting:
             self.cursor_line = rel_my // font_h
-            if self.cursor_line >= len(self.files[self.file_index]):
+
+            if self.cursor_line < 0:
+                self.cursor_line = 0
+            elif self.cursor_line >= len(self.files[self.file_index]):
                 self.cursor_line = len(self.files[self.file_index]) - 1
                 self.cursor_col = len(self.files[self.file_index][self.cursor_line])
+    
+                
             else:
                 mrow = 0
                 mx_cpy = rel_mx
@@ -472,6 +484,18 @@ class NoteFrame:
             pygame.draw.line(self.drawing_surf, (250, 250, 250), (self.prev_mx, self.prev_my), new_mpos, 2)
             self.prev_mx, self.prev_my = new_mpos
 
+        
+        #to erase
+        self.to_erase = None
+        if self.tool == TOOL_ERASER:
+            for img in self.files[self.file_index].images[::-1]:
+                rel_mx2 = mx - self.x
+                if rel_mx2 >= img.x and rel_mx2 <= img.x + img.surface.get_width()  and  rel_my >= img.y and rel_my <= img.y + img.surface.get_height():
+                    self.to_erase = img
+                    break
+
+
+
 
         if self.prev_input_hold == self.input_hold and self.input_hold:
             self.repeat_timer -= 1
@@ -500,6 +524,10 @@ class NoteFrame:
         self.surf.fill(self.theme[0])
 
         font_h = self.font.size('|')[1]
+
+        #to erase
+        if self.to_erase:
+            pygame.draw.rect(self.surf, colorSum(self.theme[0], (100, 100, 100)), (self.to_erase.x, self.to_erase.y - self.scroll, *self.to_erase.surface.get_size()))
 
         #selection
         selection_start = self.selection_start
@@ -568,8 +596,10 @@ class NoteFrame:
         
         self.cursor_color_swap_timer -= 1
 
-        pygame.draw.rect(self.surf, self.cursor_color, (LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.files[self.file_index][self.cursor_line][:self.cursor_col])[0], font_h*self.cursor_line -self.scroll,  1, font_h ))
-        
+        try:
+            pygame.draw.rect(self.surf, self.cursor_color, (LINE_INDEX_WIDTH + LINE_PAD + self.font.size(self.files[self.file_index][self.cursor_line][:self.cursor_col])[0], font_h*self.cursor_line -self.scroll,  1, font_h ))
+        except:
+            print("line",self.cursor_line)
         self.surf.blit(self.drawing_surf, (0, 0))
 
         #indices
