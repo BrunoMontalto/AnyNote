@@ -27,6 +27,8 @@ LINE_INDEX_WIDTH = 50
 LINE_PAD = 5
 
 
+
+
 class NoteFile:
     def __init__(self, lines = [""]):
         self.lines = lines
@@ -41,6 +43,11 @@ class NoteFile:
     def set_line(self, line, string):
         self.lines[line] = string
     
+
+class NoteImg:
+    def __init__(self, surface, position):
+        self.surface = surface
+        self.x, self.y = position
 
 
 class NoteFrame:
@@ -78,6 +85,7 @@ class NoteFrame:
         #drawing
         self.drawing = False
         self.prev_mx, self.prev_my = None, None
+        self.drawing_bbox = None
         self.drawing_surf = pygame.Surface(size, pygame.SRCALPHA) #stores what the user is drawing temporarily
 
     def print(self):
@@ -85,7 +93,7 @@ class NoteFrame:
             print(self.files[self.file_index][i])
 
     def set_size(self, size):
-        if size[0] < 0 or size[1] < 0 or (size[0] == self.w and size[1] == self.h):
+        if size[0] < 1 or size[1] < 1 or (size[0] == self.w and size[1] == self.h):
             return
         self.w, self.h = size
         self.surf = pygame.Surface(size)
@@ -371,6 +379,17 @@ class NoteFrame:
                     
                     elif self.tool == TOOL_BRUSH:
                         self.prev_mx, self.prev_my = mx - self.x, my - self.y
+                        self.drawing_bbox = [999999, 999999, 0, 0]
+                        new_mpos = (mx - self.x, my - self.y)
+                        if self.prev_mx < self.drawing_bbox[0]:
+                            self.drawing_bbox[0] = self.prev_mx
+                        if self.prev_mx > self.drawing_bbox[2]:
+                            self.drawing_bbox[2] = self.prev_mx
+
+                        if self.prev_my < self.drawing_bbox[1]:
+                            self.drawing_bbox[1] = self.prev_my
+                        if self.prev_my > self.drawing_bbox[3]:
+                            self.drawing_bbox[3] = self.prev_my
                         self.drawing = True
             
             #TODO fluid scrolling
@@ -391,6 +410,15 @@ class NoteFrame:
                     self.selecting = False
                     self.selection_end = (self.cursor_line, self.cursor_col)
                 elif self.tool == TOOL_BRUSH:
+                    if self.drawing_bbox:
+                        size = (self.drawing_bbox[2] - self.drawing_bbox[0] + 2, self.drawing_bbox[3] - self.drawing_bbox[1] + 2)
+                        s = pygame.Surface(size, pygame.SRCALPHA)
+                        s.blit(self.drawing_surf, (-self.drawing_bbox[0], -self.drawing_bbox[1]))
+                        img = NoteImg(s, (self.drawing_bbox[0], self.drawing_bbox[1] + self.scroll))
+                        self.files[self.file_index].images.append(img)
+
+                        self.drawing_bbox = None
+                        
                     self.drawing_surf.fill((0, 0, 0, 0))
                     self.drawing = False
                     self.prev_mx = None
@@ -430,6 +458,17 @@ class NoteFrame:
 
         elif self.drawing:
             new_mpos = (mx - self.x, my - self.y)
+            if new_mpos[0] < self.drawing_bbox[0]:
+                self.drawing_bbox[0] = new_mpos[0]
+            if new_mpos[0] > self.drawing_bbox[2]:
+                self.drawing_bbox[2] = new_mpos[0]
+
+            if new_mpos[1] < self.drawing_bbox[1]:
+                self.drawing_bbox[1] = new_mpos[1]
+            if new_mpos[1] > self.drawing_bbox[3]:
+                self.drawing_bbox[3] = new_mpos[1]
+
+                
             pygame.draw.line(self.drawing_surf, (250, 250, 250), (self.prev_mx, self.prev_my), new_mpos, 2)
             self.prev_mx, self.prev_my = new_mpos
 
@@ -513,6 +552,11 @@ class NoteFrame:
         for i in range(max(self.scroll//font_h - 1, 0), min(self.scroll//font_h + self.h//font_h + 1 ,len(self.files[self.file_index]))):
             text = self.font.render(str(self.files[self.file_index][i]), True, self.theme[1])
             self.surf.blit(text, (LINE_INDEX_WIDTH + LINE_PAD, font_h * i + font_h//2 - text.get_height()//2 - self.scroll))
+
+        #images
+        for i in range(len(self.files[self.file_index].images)):
+            img = self.files[self.file_index].images[i]
+            self.surf.blit(img.surface, (img.x, img.y - self.scroll))
 
         #cursor
         if self.cursor_color_swap_timer <= 0:

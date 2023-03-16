@@ -36,7 +36,8 @@ def main():
     buttons = [ImageButton(LINE_INDEX_WIDTH//2,FILES_BAR_HEIGHT//2, (LINE_INDEX_WIDTH - 4, FILES_BAR_HEIGHT - 4), colorSum(frame.theme[0], (-5, -5, -5)), TOOLS[frame.tool], 0)]
     button_down = None
 
-    def draw(mx, my):
+    def draw():
+        mx, my = pygame.mouse.get_pos()
         w, h = wn.get_size()
         frame.set_size((w, h - 16 - FILES_BAR_HEIGHT))
 
@@ -110,7 +111,7 @@ def main():
             
             
         #######################
-        draw(mx, my)
+        draw()
         #######################
         
         clock.tick(60)
